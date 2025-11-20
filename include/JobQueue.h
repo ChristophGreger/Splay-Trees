@@ -34,7 +34,6 @@ private:
     mutable std::mutex mtx;
 
     Job* root;
-    const unsigned int N;
 
     static bool less(const JobData& jobData1, const JobData& jobData2);
 
@@ -55,6 +54,7 @@ private:
 public:
     explicit JobQueue(unsigned int N);
     ~JobQueue();
+    const unsigned int N;
 
     void insert(const JobData &jobData);
     [[nodiscard]] bool jobsAvailable() const; //Returns true if there are jobs in the queue.

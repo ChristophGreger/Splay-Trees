@@ -181,6 +181,7 @@ void JobQueue::splay(Job* x) {
 void JobQueue::insert(const JobData &jobData) {
     std::lock_guard<std::mutex> lock(mtx);
     insertNonBlocking(jobData);
+    std::cout << "Inserted job: " << jobData.jobName << " with priority " << jobData.priority << " and VRT " << jobData.VRT << std::endl;
 }
 
 void JobQueue::insertNonBlocking(const JobData &jobData) {
@@ -201,7 +202,7 @@ void JobQueue::insertNonBlocking(const JobData &jobData) {
             x = x->right;
         } else {
             //Someone tried to insert the same job twice. We do not allow this. (and it actually shouldn't be possible
-            std::cerr << "Someone tried to insert a Job twice. What a bad idea! Only differing by name doesn't work!\n";
+            std::cerr << "Someone tried to insert a Job twice. What a bad idea! Only differing by name doesn't work!" << std::endl;
             return;
         }
     }
@@ -267,10 +268,13 @@ JobData JobQueue::processNextJobNonBlocking() {
     removeJob(nextJob);
 
     if (jobData.VRT > N) {
+        JobData returning = jobData;
         jobData.VRT -= N;
         insertNonBlocking(jobData);
-        return jobData;
+        std::cout << jobData.jobName << " is now being processed for " << N << " time units. Remaining VRT afterwards:" << jobData.VRT << std::endl;
+        return returning;
     }
+    std::cout << jobData.jobName << " is now being processed for " << jobData.VRT << " time units. Job is finished afterwards." << std::endl;
     return jobData;
 }
 
