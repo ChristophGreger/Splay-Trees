@@ -7,7 +7,7 @@
 
 #include <chrono>
 #include <string>
-#include <semaphore>
+#include <mutex>
 
 using std::chrono::steady_clock;
 using std::chrono::time_point;
@@ -31,7 +31,7 @@ struct Job {
 class JobQueue {
 
 private:
-    std::binary_semaphore semaphore;
+    mutable std::mutex mtx;
 
     Job* root;
     const unsigned int N;

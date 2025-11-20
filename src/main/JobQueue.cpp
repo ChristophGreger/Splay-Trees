@@ -18,7 +18,7 @@ bool JobQueue::less(const JobData& jobData1, const JobData& jobData2) {
 Job::Job(JobData jobData, Job* parent, Job* left, Job* right)
     : left(left), right(right), parent(parent), jobData(std::move(jobData)) {}
 
-JobQueue::JobQueue(unsigned int N) : root(nullptr), N(N), semaphore(1) {
+JobQueue::JobQueue(unsigned int N) : root(nullptr), N(N) {
     if (N == 0) {
         throw std::invalid_argument("Time slice N must be > 0.");
     }
@@ -26,7 +26,6 @@ JobQueue::JobQueue(unsigned int N) : root(nullptr), N(N), semaphore(1) {
 
 JobQueue::~JobQueue() {
 
-    semaphore.acquire();
     // Iterative destructor. As depth can be O(n), recursion may lead to stack overflow.
     if (!root) return;
     std::vector<Job*> st;
@@ -50,7 +49,6 @@ JobQueue::~JobQueue() {
         }
     }
     root = nullptr;
-    semaphore.release();
 }
 
 Job* JobQueue::subtreeMin(Job* n) {
@@ -181,9 +179,8 @@ void JobQueue::splay(Job* x) {
 }
 
 void JobQueue::insert(const JobData &jobData) {
-    semaphore.acquire();
+    std::lock_guard<std::mutex> lock(mtx);
     insertNonBlocking(jobData);
-    semaphore.release();
 }
 
 void JobQueue::insertNonBlocking(const JobData &jobData) {
@@ -255,6 +252,7 @@ void JobQueue::removeJob(Job* t) {
 }
 
 bool JobQueue::jobsAvailable() const {
+    std::lock_guard<std::mutex> lock(mtx);
     return root != nullptr;
 }
 
@@ -277,8 +275,6 @@ JobData JobQueue::processNextJobNonBlocking() {
 }
 
 JobData JobQueue::processNextJob() {
-    semaphore.acquire();
-    JobData jobData = processNextJobNonBlocking();
-    semaphore.release();
-    return jobData;
+    std::lock_guard<std::mutex> lock(mtx);
+    return processNextJobNonBlocking();
 }
