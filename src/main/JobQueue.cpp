@@ -2,27 +2,41 @@
 // Created by Christoph Greger on 07.11.25.
 //
 
-#include "SplayTree.h"
+#include "JobQueue.h"
+#include <stdexcept>
+#include <iostream>
+#include <utility>
 #include <vector>
 
-Node::Node(int key, int id, Node* parent, Node* left, Node* right)
-    : left(left), right(right), parent(parent), key(key), id(id) {}
+bool JobQueue::less(const JobData& jobData1, const JobData& jobData2) {
+    //The "biggest" job is the next job.
+    return (jobData1.priority < jobData2.priority)
+        || (jobData1.priority == jobData2.priority) && (jobData1.VRT > jobData2.VRT)
+        || ((jobData1.priority == jobData2.priority) && (jobData1.VRT == jobData2.VRT) && (jobData1.timestamp> jobData2.timestamp));
+}
 
-SplayTree::SplayTree() : root(nullptr) {}
+Job::Job(JobData jobData, Job* parent, Job* left, Job* right)
+    : left(left), right(right), parent(parent), jobData(std::move(jobData)) {}
 
-SplayTree::~SplayTree() {
+JobQueue::JobQueue(unsigned int N) : root(nullptr), N(N) {
+    if (N == 0) {
+        throw std::invalid_argument("Time slice N must be > 0.");
+    }
+}
+
+JobQueue::~JobQueue() {
 
     // Iterative destructor. As depth can be O(n), recursion may lead to stack overflow.
     if (!root) return;
-    std::vector<Node*> st;
-    Node* curr = root;
-    Node* last = nullptr;
+    std::vector<Job*> st;
+    Job* curr = root;
+    Job* last = nullptr;
     while (curr || !st.empty()) {
         if (curr) {
             st.push_back(curr);
             curr = curr->left;
         } else {
-            Node* node = st.back();
+            Job* node = st.back();
             if (node->right && last != node->right) {
                 //If right subtree not yet processed
                 curr = node->right;
@@ -37,7 +51,7 @@ SplayTree::~SplayTree() {
     root = nullptr;
 }
 
-Node* SplayTree::subtreeMin(Node* n) {
+Job* JobQueue::subtreeMin(Job* n) {
     if (!n) {
         return nullptr;
     }
@@ -47,7 +61,7 @@ Node* SplayTree::subtreeMin(Node* n) {
     return n;
 }
 
-Node* SplayTree::subtreeMax(Node* n) {
+Job* JobQueue::subtreeMax(Job* n) {
     if (!n) {
         return nullptr;
     }
@@ -57,22 +71,8 @@ Node* SplayTree::subtreeMax(Node* n) {
     return n;
 }
 
-Node* SplayTree::findNode(int key, int id) {
-    Node* x = root;
-    while (x) {
-        if (SplayTree::less_pair(key, id, x->key, x->id)) {
-            x = x->left;
-        } else if (SplayTree::less_pair(x->key, x->id, key, id)) {
-            x = x->right;
-        } else {
-            return x;
-        }
-    }
-    return nullptr;
-}
-
-void SplayTree::rotateLeft(Node* x) {
-    Node* y = x->right;
+void JobQueue::rotateLeft(Job* x) {
+    Job* y = x->right;
     if (!y) {
         return;
     }
@@ -95,8 +95,8 @@ void SplayTree::rotateLeft(Node* x) {
     x->parent = y;
 }
 
-void SplayTree::rotateRight(Node* x) {
-    Node* y = x->left;
+void JobQueue::rotateRight(Job* x) {
+    Job* y = x->left;
     if (!y) {
         return;
     }
@@ -119,7 +119,7 @@ void SplayTree::rotateRight(Node* x) {
     x->parent = y;
 }
 
-void SplayTree::zig(Node* x) {
+void JobQueue::zig(Job* x) {
     if (!x->parent) {
         return;
     }
@@ -130,9 +130,9 @@ void SplayTree::zig(Node* x) {
     }
 }
 
-void SplayTree::zigzig(Node* x) {
-    Node* p = x->parent;
-    Node* g = p->parent;
+void JobQueue::zigzig(Job* x) {
+    Job* p = x->parent;
+    Job* g = p->parent;
     if (!g) {
         return;
     }
@@ -145,9 +145,9 @@ void SplayTree::zigzig(Node* x) {
     }
 }
 
-void SplayTree::zigzag(Node* x) {
-    Node* p = x->parent;
-    Node* g = p->parent;
+void JobQueue::zigzag(Job* x) {
+    Job* p = x->parent;
+    Job* g = p->parent;
     if (!g) {
         return;
     }
@@ -161,7 +161,7 @@ void SplayTree::zigzag(Node* x) {
     }
 }
 
-void SplayTree::splay(Node* x) {
+void JobQueue::splay(Job* x) {
     if (!x) {
         return;
     }
@@ -178,30 +178,30 @@ void SplayTree::splay(Node* x) {
     }
 }
 
-void SplayTree::insert(int key, int id) {
+void JobQueue::insert(const JobData &jobData) {
     if (!root) {
-        root = new Node(key, id);
+        root = new Job(jobData);
         return;
     }
 
-    Node* x = root;
-    Node* p = nullptr;
+    Job* x = root;
+    Job* p = nullptr;
 
     while (x) {
         p = x;
-        if (SplayTree::less_pair(key, id, x->key, x->id)) {
+        if (JobQueue::less(jobData, x->jobData)) {
             x = x->left;
-        } else if (SplayTree::less_pair(x->key, x->id, key, id)) {
+        } else if (JobQueue::less(x->jobData, jobData)) {
             x = x->right;
         } else {
-            //I Decided: duplicate, do not insert, but splay this node
-            splay(x);
+            //Someone tried to insert the same job twice. We do not allow this. (and it actually shouldn't be possible
+            std::cerr << "Someone tried to insert a Job twice. What a bad idea! Only differing by name doesn't work!\n";
             return;
         }
     }
 
-    Node* n = new Node(key, id, p);
-    if (SplayTree::less_pair(key, id, p->key, p->id)) {
+    Job* n = new Job(jobData, p);
+    if (JobQueue::less(jobData, p->jobData)) {
         p->left = n;
     } else {
         p->right = n;
@@ -209,46 +209,15 @@ void SplayTree::insert(int key, int id) {
     splay(n);
 }
 
-bool SplayTree::contains(int key, int id) {
-    Node* f = findNode(key, id);
-    if (f) {
-        splay(f);
-        return true;
-    }
-    return false;
-}
-
-Node* SplayTree::findSmallestByKey(int key) {
-    Node* x = root;
-    Node* res = nullptr;
-
-    while (x) {
-        if (key < x->key) {
-            x = x->left;
-        } else if (key > x->key) {
-            x = x->right;
-        } else {
-            res = x;
-            x = x->left;
-        }
-    }
-
-    if (res) {
-        splay(res);
-    }
-    return res;
-}
-
-
-void SplayTree::removeNode(Node* t) {
+void JobQueue::removeJob(Job* t) {
     if (!t) {
         return;
     }
 
     splay(t);
 
-    Node* L = t->left;
-    Node* R = t->right;
+    Job* L = t->left;
+    Job* R = t->right;
 
     if (L) {
         L->parent = nullptr;
@@ -265,7 +234,7 @@ void SplayTree::removeNode(Node* t) {
         return;
     }
 
-    Node* m = subtreeMax(L);
+    Job* m = subtreeMax(L);
     splay(m);
     m->right = R;
 
@@ -276,20 +245,24 @@ void SplayTree::removeNode(Node* t) {
     root = m;
 }
 
-bool SplayTree::remove(int key, int id) {
-    Node* t = findNode(key, id);
-    if (!t) {
-        return false;
-    }
-    removeNode(t);
-    return true;
+bool JobQueue::jobsAvailable() const {
+    return root != nullptr;
 }
 
-bool SplayTree::removeSmallest(int key) {
-    Node* t = findSmallestByKey(key);
-    if (!t || t->key != key) {
-        return false;
+JobData JobQueue::processNextJob() {
+    if (!root) {
+        throw std::runtime_error("No jobs in the queue.");
     }
-    removeNode(t);
-    return true;
+
+    Job* nextJob = subtreeMax(root);
+    JobData jobData = nextJob->jobData;
+
+    removeJob(nextJob);
+
+    if (jobData.VRT > N) {
+        jobData.VRT -= N;
+        insert(jobData);
+        return jobData;
+    }
+    return jobData;
 }

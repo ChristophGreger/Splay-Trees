@@ -14,8 +14,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 add_library(bib STATIC
-        include/SplayTree.h
-        src/main/SplayTree.cpp
+        include/JobQueue.h
+        src/main/JobQueue.cpp
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")

@@ -2,134 +2,103 @@
 // Created by Christoph Greger on 07.11.25.
 //
 
-#include "SplayTree.h"
+#include "JobQueue.h"
 #include <gtest/gtest.h>
+#include <chrono>
 
-TEST(SplayTreeTest, EmptyTreeOperations) {
+using std::chrono::steady_clock;
+using std::chrono::milliseconds;
 
-    SplayTree tree;
-
-    // Empty tree should not contain any element
-    EXPECT_FALSE(tree.contains(10, 1));
-
-    // findSmallestByKey on empty tree returns nullptr
-    EXPECT_EQ(tree.findSmallestByKey(10), nullptr);
-
-    // Removing any element from empty tree should return false
-    EXPECT_FALSE(tree.remove(10, 1));
-    EXPECT_FALSE(tree.removeSmallest(10));
+TEST(JobQueueTest, ConstructorRejectsZeroN) {
+    EXPECT_THROW(JobQueue q(0), std::invalid_argument);
 }
 
-TEST(SplayTreeTest, SingleInsertAndRemove) {
-
-    SplayTree tree;
-
-    // Insert a single node
-    tree.insert(5, 100);
-
-    // Now tree should contain that node
-    EXPECT_TRUE(tree.contains(5, 100));
-
-    // Inserting the same key and id again should work
-    tree.insert(5, 100);
-    EXPECT_TRUE(tree.contains(5, 100));
-
-    // findSmallestByKey should return the node for the exact key
-    Node* result = tree.findSmallestByKey(5);
-    ASSERT_NE(result, nullptr);
-    EXPECT_EQ(result->key, 5);
-    EXPECT_EQ(result->id, 100);
-
-    // Remove the node
-    EXPECT_TRUE(tree.remove(5, 100));
-
-    // After removal, tree should be empty
-    EXPECT_FALSE(tree.contains(5, 100));
-    EXPECT_EQ(tree.findSmallestByKey(5), nullptr);
+TEST(JobQueueTest, ProcessNextJobOnEmptyQueue) {
+    JobQueue q(1);
+    EXPECT_THROW(q.processNextJob(), std::runtime_error);
 }
 
-TEST(SplayTreeTest, MultipleInsertUniqueKeys) {
+TEST(JobQueueTest, JobsAvailableAfterInsert) {
+    JobQueue q(5);
+    auto now = steady_clock::now();
+    JobData job{1, 10, now, "job1"};
 
-    SplayTree tree;
-
-    // Insert multiple nodes with unique keys
-    tree.insert(10, 1);
-    tree.insert(20, 1);
-    tree.insert(5, 1);
-
-    // All inserted nodes should be found
-    EXPECT_TRUE(tree.contains(10, 1));
-    EXPECT_TRUE(tree.contains(20, 1));
-    EXPECT_TRUE(tree.contains(5, 1));
-
-    // findSmallestByKey for each existing key returns correct node
-    Node* n5 = tree.findSmallestByKey(5);
-    ASSERT_NE(n5, nullptr);
-    EXPECT_EQ(n5->key, 5);
-    EXPECT_EQ(n5->id, 1);
-
-    Node* n10 = tree.findSmallestByKey(10);
-    ASSERT_NE(n10, nullptr);
-    EXPECT_EQ(n10->key, 10);
-    EXPECT_EQ(n10->id, 1);
-
-    Node* n20 = tree.findSmallestByKey(20);
-    ASSERT_NE(n20, nullptr);
-    EXPECT_EQ(n20->key, 20);
-    EXPECT_EQ(n20->id, 1);
-
-    // Remove one key and check others remain
-    EXPECT_TRUE(tree.remove(10, 1));
-    EXPECT_FALSE(tree.contains(10, 1));
-    EXPECT_TRUE(tree.contains(5, 1));
-    EXPECT_TRUE(tree.contains(20, 1));
-
-    // Removing a non-existent key should not affect existing keys
-    EXPECT_FALSE(tree.remove(999, 999));
-    EXPECT_TRUE(tree.contains(5, 1));
-    EXPECT_TRUE(tree.contains(20, 1));
+    EXPECT_FALSE(q.jobsAvailable());
+    q.insert(job);
+    EXPECT_TRUE(q.jobsAvailable());
 }
 
-TEST(SplayTreeTest, DuplicateKeysHandling) {
+TEST(JobQueueTest, PriorityOrdering) {
+    JobQueue q(100);
 
-    SplayTree tree;
+    auto now = steady_clock::now();
+    JobData low{1, 5, now, "low"};
+    JobData mid{2, 5, now, "mid"};
+    JobData high{3, 5, now, "high"};
 
-    // Insert multiple nodes with the same key but different ids
-    tree.insert(10, 5);
-    tree.insert(10, 2);
-    tree.insert(10, 8);
+    q.insert(mid);
+    q.insert(low);
+    q.insert(high);
 
-    // Tree should contain all inserted unique pairs
-    EXPECT_TRUE(tree.contains(10, 5));
-    EXPECT_TRUE(tree.contains(10, 2));
-    EXPECT_TRUE(tree.contains(10, 8));
+    EXPECT_EQ(q.processNextJob().jobName, "high");
+    EXPECT_EQ(q.processNextJob().jobName, "mid");
+    EXPECT_EQ(q.processNextJob().jobName, "low");
+    EXPECT_FALSE(q.jobsAvailable());
+}
 
-    // findSmallestByKey should return the node with the smallest id for key=10
-    Node* smallest = tree.findSmallestByKey(10);
-    ASSERT_NE(smallest, nullptr);
-    EXPECT_EQ(smallest->key, 10);
-    EXPECT_EQ(smallest->id, 2);
+TEST(JobQueueTest, VrtOrderingForEqualPriority) {
+    JobQueue q(100);
 
-    // removeSmallest should remove the (10,2) node
-    EXPECT_TRUE(tree.removeSmallest(10));
-    EXPECT_FALSE(tree.contains(10, 2));
+    auto now = steady_clock::now();
+    JobData longer{1, 10, now, "long"};
+    JobData shorter{1, 5, now, "short"};
 
-    // Now the smallest id for key=10 should be 5
-    Node* newSmallest = tree.findSmallestByKey(10);
-    ASSERT_NE(newSmallest, nullptr);
-    EXPECT_EQ(newSmallest->id, 5);
+    q.insert(longer);
+    q.insert(shorter);
 
-    // Remove a specific key-id pair (not the smallest)
-    EXPECT_TRUE(tree.remove(10, 8));
-    EXPECT_FALSE(tree.contains(10, 8));
+    EXPECT_EQ(q.processNextJob().jobName, "short");
+    EXPECT_EQ(q.processNextJob().jobName, "long");
+}
 
-    // The remaining node with key=10 should be (10,5)
-    EXPECT_TRUE(tree.contains(10, 5));
+TEST(JobQueueTest, TimestampTieBreak) {
+    JobQueue q(100);
 
-    // Remove the last remaining node with key=10
-    EXPECT_TRUE(tree.removeSmallest(10));
-    EXPECT_FALSE(tree.contains(10, 5));
+    auto base = steady_clock::now();
+    JobData older{1, 5, base - milliseconds(10), "old"};
+    JobData newer{1, 5, base, "new"};
 
-    // Tree should be empty now for key=10
-    EXPECT_EQ(tree.findSmallestByKey(10), nullptr);
+    q.insert(newer);
+    q.insert(older);
+
+    EXPECT_EQ(q.processNextJob().jobName, "old");
+    EXPECT_EQ(q.processNextJob().jobName, "new");
+}
+
+TEST(JobQueueTest, TimeSlicingAndReinsertion) {
+    JobQueue q(3); // time slice = 3 seconds
+
+    auto base = steady_clock::now();
+    JobData j1{1, 5, base, "j1"};
+    JobData j2{1, 4, base - milliseconds(1), "j2"};
+
+    q.insert(j1);
+    q.insert(j2);
+
+    JobData r1 = q.processNextJob(); // j2 first
+    EXPECT_EQ(r1.jobName, "j2");
+    EXPECT_EQ(r1.VRT, 1);
+
+    JobData r2 = q.processNextJob(); // j2 finishes
+    EXPECT_EQ(r2.jobName, "j2");
+    EXPECT_EQ(r2.VRT, 1);
+
+    JobData r3 = q.processNextJob(); // j1 reduced
+    EXPECT_EQ(r3.jobName, "j1");
+    EXPECT_EQ(r3.VRT, 2);
+
+    JobData r4 = q.processNextJob(); // j1 finishes
+    EXPECT_EQ(r4.jobName, "j1");
+    EXPECT_EQ(r4.VRT, 2);
+
+    EXPECT_FALSE(q.jobsAvailable());
 }
