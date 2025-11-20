@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <string>
+#include <semaphore>
 
 using std::chrono::steady_clock;
 using std::chrono::time_point;
@@ -30,6 +31,8 @@ struct Job {
 class JobQueue {
 
 private:
+    std::binary_semaphore semaphore;
+
     Job* root;
     const unsigned int N;
 
@@ -45,6 +48,9 @@ private:
     void zigzag(Job* x);
     void splay(Job* x);
     void removeJob(Job* p);
+
+    void insertNonBlocking(const JobData &jobData);
+    JobData processNextJobNonBlocking();
 
 public:
     explicit JobQueue(unsigned int N);
