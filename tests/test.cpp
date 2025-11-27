@@ -6,19 +6,22 @@
 #include <gtest/gtest.h>
 #include <chrono>
 
-using std::chrono::steady_clock;
 using std::chrono::milliseconds;
+using std::chrono::steady_clock;
 
-TEST(JobQueueTest, ConstructorRejectsZeroN) {
+TEST(JobQueueTest, ConstructorRejectsZeroN)
+{
     EXPECT_THROW(JobQueue q(0), std::invalid_argument);
 }
 
-TEST(JobQueueTest, ProcessNextJobOnEmptyQueue) {
+TEST(JobQueueTest, ProcessNextJobOnEmptyQueue)
+{
     JobQueue q(1);
     EXPECT_THROW(q.processNextJob(), std::runtime_error);
 }
 
-TEST(JobQueueTest, JobsAvailableAfterInsert) {
+TEST(JobQueueTest, JobsAvailableAfterInsert)
+{
     JobQueue q(5);
     auto now = steady_clock::now();
     JobData job{1, 10, now, "job1"};
@@ -28,7 +31,8 @@ TEST(JobQueueTest, JobsAvailableAfterInsert) {
     EXPECT_TRUE(q.jobsAvailable());
 }
 
-TEST(JobQueueTest, PriorityOrdering) {
+TEST(JobQueueTest, PriorityOrdering)
+{
     JobQueue q(100);
 
     auto now = steady_clock::now();
@@ -46,7 +50,8 @@ TEST(JobQueueTest, PriorityOrdering) {
     EXPECT_FALSE(q.jobsAvailable());
 }
 
-TEST(JobQueueTest, VrtOrderingForEqualPriority) {
+TEST(JobQueueTest, VrtOrderingForEqualPriority)
+{
     JobQueue q(100);
 
     auto now = steady_clock::now();
@@ -60,7 +65,8 @@ TEST(JobQueueTest, VrtOrderingForEqualPriority) {
     EXPECT_EQ(q.processNextJob().jobName, "long");
 }
 
-TEST(JobQueueTest, TimestampTieBreak) {
+TEST(JobQueueTest, TimestampTieBreak)
+{
     JobQueue q(100);
 
     auto base = steady_clock::now();
@@ -74,7 +80,8 @@ TEST(JobQueueTest, TimestampTieBreak) {
     EXPECT_EQ(q.processNextJob().jobName, "new");
 }
 
-TEST(JobQueueTest, TimeSlicingAndReinsertion) {
+TEST(JobQueueTest, TimeSlicingAndReinsertion)
+{
     JobQueue q(3); // time slice = 3 seconds
 
     auto base = steady_clock::now();

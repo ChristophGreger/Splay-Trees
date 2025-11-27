@@ -18,7 +18,10 @@ add_library(bib STATIC
         src/main/JobQueue.cpp
 )
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+if(APPLE)
+    # Use libc++ on macOS
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+endif()
 
 target_include_directories(bib
         PUBLIC
