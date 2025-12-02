@@ -336,26 +336,26 @@ JobData JobQueue::processNextJobNonBlocking()
     if (!root)
         throw std::runtime_error("No jobs in the queue.");
 
-    // splay the node and access it
-    Job *job = subtreeMax(root);
-    splay(job);
-    JobData &jobData = job->jobData;
+
+    Job *nextJob = subtreeMax(root);
+    JobData jobData = nextJob->jobData;
+
+    removeJob(nextJob);
 
     // modify the node VRT if it is still greater than N
     if (jobData.VRT > N)
     {
         jobData.VRT -= N;
+        insertNonBlocking(jobData);
         std::cout << jobData.jobName << " is now being processed for " << N
                   << " time units. Remaining VRT afterwards:" << jobData.VRT << std::endl;
         return jobData;
     }
 
-    // remove from queue if the job has been finished
+    // do not insert the job again if it is finished
     std::cout << jobData.jobName << " is now being processed for "
               << jobData.VRT << " time units. Job is finished afterwards" << std::endl;
-    JobData result = job->jobData;
-    removeJob(job);
-    return result;
+    return jobData;
 }
 
 JobData JobQueue::processNextJob()
