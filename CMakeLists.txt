@@ -64,3 +64,4 @@ enable_testing()
 #Add tests
 add_gtest(TEST tests/test.cpp)
 add_gtest(DEMO demos/demo.cpp)
+add_gtest(INT_DEMO demos/interactive_demo.cpp)

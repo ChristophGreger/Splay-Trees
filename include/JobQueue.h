@@ -50,18 +50,24 @@ private:
     void zigzig(Job *x);
     void zigzag(Job *x);
     void splay(Job *x);
-    void removeJob(Job *x);
 
     void insertNonBlocking(const JobData &jobData);
     JobData processNextJobNonBlocking();
+    void removeJob(Job *x);
+
+    void printTreeRecursive(Job *node, const string &prefix, bool isLeft);
+    Job *bfsFindByName(Job *root, const string &targetName);
 
 public:
     explicit JobQueue(unsigned int N);
     ~JobQueue();
     const unsigned int N;
 
-    void insert(const JobData &jobData);
-    std::atomic<bool> stop{false};
+    void printTree();
+
+    void insert(const JobData &jobData);      // used to add a new job
+    void removeJobByName(const string &name); // used for killing a job
+    std::atomic<bool> stop{false};            // used for stopping the demo
     [[nodiscard]] bool jobsAvailable() const; // Returns true if there are jobs in the queue.
     JobData processNextJob();                 // Returns the JobData of the next job and removes it from the queue or reduces its VRT.
 };

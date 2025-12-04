@@ -7,6 +7,7 @@
 #include <iostream>
 #include <utility>
 #include <vector>
+#include <queue>
 
 bool JobQueue::less(const JobData &jobData1, const JobData &jobData2)
 {
@@ -307,19 +308,19 @@ void JobQueue::removeJob(Job *x)
     delete x;
     root = nullptr;
 
-    if (!L)
+    if (!R)
     {
-        root = R;
+        root = L;
         return;
     }
 
-    Job *m = subtreeMax(L);
+    Job *m = subtreeMin(R);
     splay(m);
-    m->right = R;
+    m->left = L;
 
-    if (R)
+    if (L)
     {
-        R->parent = m;
+        L->parent = m;
     }
 
     root = m;
@@ -335,7 +336,6 @@ JobData JobQueue::processNextJobNonBlocking()
 {
     if (!root)
         throw std::runtime_error("No jobs in the queue.");
-
 
     Job *nextJob = subtreeMax(root);
     JobData jobData = nextJob->jobData;
@@ -362,4 +362,94 @@ JobData JobQueue::processNextJob()
 {
     std::lock_guard<std::mutex> lock(mtx);
     return processNextJobNonBlocking();
+}
+
+void JobQueue::printTreeRecursive(Job *node, const std::string &prefix, bool isLeft)
+{
+    if (!node)
+        return;
+
+    // Print right subtree first (top)
+    if (node->right)
+    {
+        printTreeRecursive(node->right,
+                           prefix + (isLeft ? "│   " : "    "),
+                           false);
+    }
+
+    // Print the current node
+    std::cout << prefix;
+    if (isLeft)
+        std::cout << "└── ";
+    else
+        std::cout << "┌── ";
+
+    std::cout << "(pri=" << node->jobData.priority
+              << ", vrt=" << node->jobData.VRT
+              << ") " << node->jobData.jobName << "\n";
+
+    // Print left subtree (bottom)
+    if (node->left)
+    {
+        printTreeRecursive(node->left,
+                           prefix + (isLeft ? "    " : "│   "),
+                           true);
+    }
+}
+
+void JobQueue::printTree()
+{
+    if (!root)
+    {
+        std::cout << "(tree is empty)\n";
+        return;
+    }
+    printTreeRecursive(root, "", false);
+}
+
+Job *JobQueue::bfsFindByName(Job *root, const std::string &targetName)
+{
+    if (!root)
+        return nullptr;
+
+    std::queue<Job *> q;
+    q.push(root);
+
+    while (!q.empty())
+    {
+        Job *cur = q.front();
+        q.pop();
+
+        if (cur->jobData.jobName == targetName)
+            return cur;
+
+        // RIGHT first, matching pretty-tree orientation
+        if (cur->right)
+            q.push(cur->right);
+        if (cur->left)
+            q.push(cur->left);
+    }
+
+    return nullptr;
+}
+
+void JobQueue::removeJobByName(const std::string &name)
+{
+    std::lock_guard<std::mutex> lock(mtx);
+
+    if (!root)
+    {
+        std::cout << "(tree is empty)\n";
+        return;
+    }
+
+    Job *target = bfsFindByName(root, name);
+    if (!target)
+    {
+        std::cout << "Job not found: " << name << "\n";
+        return;
+    }
+
+    removeJob(target);
+    std::cout << "Removed job: " << name << "\n";
 }
